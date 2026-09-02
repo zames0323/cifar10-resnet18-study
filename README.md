@@ -2,23 +2,18 @@
 
 PyTorch 기반 비전 전이학습(Transfer Learning) 파이프라인
 
-## ? 주요 구현 내용
-- **Model:** ImageNet 사전학습 ResNet18 백본 활용 및 CIFAR-10(10 Classes) 맞춤 FC Layer 재설계
-- **Data Augmentation:** RandomCrop(padding=4), RandomHorizontalFlip, Normalization 적용
-- **Optimization:** AdamW Optimizer ($lr=10^{-3}$, $weight\_decay=10^{-4}$) 및 CrossEntropyLoss 적용
-- **Evaluation:** 매 에폭마다 검증 데이터셋에 대한 Accuracy 추적 및 시각화
-
-## ? 학습 결과 (3 Epochs)
-- **최종 검증 정확도 (Test Accuracy):** **77.86%**
-- **Loss 수렴:** 1.10 $\rightarrow$ 0.73으로 안정적 수렴 확인
+## ? 실험 결과 (10 Epochs 확장 실험)
+- **최종 검증 정확도 (Test Accuracy):** **82.5%** (기존 3 에폭 77.8% 대비 약 4.7%p 상승)
+- **최종 Training Loss:** 0.51 달성
+- **분석 관찰:** 에폭 증가에 따라 손실값은 0.51까지 안정적으로 수렴했으나, 검증 정확도에서 77%~82% 구간의 진동이 관찰됨. 향후 Learning Rate Scheduler나 Weight Decay 조정을 통한 안정화 실험 필요성 확인.
 
 ![Training Result](results/training_result.png)
 
-## ? 실행 방법
-\`\`\`bash
-# 1. 의존성 패키지 설치
-pip install -r requirements.txt
+## ? Error Analysis (오답 원인 정성 분석)
+테스트 데이터셋 중 오분류(Misclassified)된 대표 샘플 5종을 추출하여 모델의 실패 요인을 분석했습니다.
 
-# 2. 학습 및 평가 파이프라인 실행
-python main.py
-\`\`\`
+![Error Analysis](results/error_analysis.png)
+
+- **배경 편향 (Context Bias):** 배(ship) 및 비행기(airplane)가 사슴(deer)으로 오분류된 사례를 통해, 모델이 객체 자체의 형태뿐만 아니라 회색빛/저채도 배경 색감에 영향을 받음을 확인.
+- **형태적 유사성 (Shape Confusion):** 걸윙 도어가 열린 자동차(automobile)의 윤곽선이 동물의 뾰족한 귀 실루엣과 유사하여 고양이(cat)로 오분류됨.
+- **향후 과제:** 색상 지터링(Color Jitter) 증강 기법 및 객체 집중도를 높이는 어텐션/XAI(Grad-CAM) 분석 필요성 도출.

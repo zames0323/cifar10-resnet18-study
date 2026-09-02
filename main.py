@@ -48,8 +48,8 @@ def main():
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
 
-    # 6. Training Loop (3 Epochs)
-    epochs = 3
+    # 6. Training Loop (10 Epochs)
+    epochs = 10
     train_losses, test_accuracies = [], []
 
     print("[*] Starting Training...")
