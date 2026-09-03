@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import torch
 import torch.nn as nn
@@ -9,7 +10,6 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 def main():
-    # 1. Device Setup (CUDA / MPS / CPU)
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.backends.mps.is_available():
@@ -18,7 +18,6 @@ def main():
         device = torch.device("cpu")
     print(f"[*] Using device: {device}")
 
-    # 2. Data Transforms & Augmentation
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -31,28 +30,26 @@ def main():
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
-    # 3. CIFAR-10 Dataset & DataLoaders
-    print("[*] Downloading & loading CIFAR-10 dataset...")
-    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+    print("[*] Loading CIFAR-10 dataset...")
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=False, transform=transform_train)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True, num_workers=2)
 
-    testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+    testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=False, transform=transform_test)
     testloader = torch.utils.data.DataLoader(testset, batch_size=64, shuffle=False, num_workers=2)
 
-    # 4. Model Load & Replace FC Layer
     model = resnet18(weights=ResNet18_Weights.DEFAULT)
     model.fc = nn.Linear(model.fc.in_features, 10)
     model = model.to(device)
 
-    # 5. Loss & Optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
 
-    # 6. Training Loop (10 Epochs)
+    # 10 Epochs
     epochs = 10
     train_losses, test_accuracies = [], []
+    best_acc = 0.0
 
-    print("[*] Starting Training...")
+    print("[*] Starting Training and Checkpoint Pipeline...")
     for epoch in range(epochs):
         model.train()
         running_loss = 0.0
@@ -85,7 +82,13 @@ def main():
         test_accuracies.append(acc)
         print(f"[*] Epoch {epoch+1} Results - Loss: {epoch_loss:.4f} | Accuracy: {acc:.2f}%")
 
-    # 7. Save Plots
+        # Save Best Weights Checkpoint
+        if acc > best_acc:
+            best_acc = acc
+            os.makedirs('weights', exist_ok=True)
+            torch.save(model.state_dict(), 'weights/best_model.pth')
+            print(f"[+] Saved best checkpoint with accuracy: {best_acc:.2f}% to weights/best_model.pth")
+
     os.makedirs('results', exist_ok=True)
     plt.figure(figsize=(10, 4))
     
@@ -103,7 +106,7 @@ def main():
 
     plt.tight_layout()
     plt.savefig('results/training_result.png')
-    print("[+] Training finished! Result plot saved to results/training_result.png")
+    print("[+] Training complete! Best weights saved.")
 
 if __name__ == '__main__':
     main()
