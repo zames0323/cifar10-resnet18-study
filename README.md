@@ -15,19 +15,19 @@ PyTorch 기반의 합성곱 신경망(ResNet18) 전이학습, 점진적 하이퍼파라미터 최적화(Ab
 
 | 실험 단계 | 반복 횟수 (Epochs) | Optimizer / Scheduler | 주요 적용 기법 | 최종 Loss | 검증 정확도 (Accuracy) | 핵심 의의 |
 | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Day 1 (Baseline)** | 3 | AdamW ($lr=10^{-3}$) | 기본 증강 | 0.73 | **77.86%** | 기본 학습 및 검증 파이프라인 구축 |
-| **Day 2 (Extended)** | 10 | AdamW ($lr=10^{-3}$) | 기본 증강 | 0.51 | **82.50%** | 장기 수렴 양상 확인 및 오답(Failure case) 분석 |
-| **Day 3 (XAI Integration)** | - | - | 224×224 업샘플링 | - | - | Layer 4 기반 고대비 Grad-CAM 시각화 연동 |
-| **Day 4-5 (Optimized & Verified)** | 12 | CosineAnnealingLR | ColorJitter + Sanity Check | **0.31** | **86.10%** | **손실값 진동 제어, 최고 성능 달성 (+3.6%p) 및 XAI 신뢰성 검증** |
+| **Baseline** | 3 | AdamW ($lr=10^{-3}$) | 기본 증강 | 0.73 | **77.86%** | 기본 학습 및 검증 파이프라인 구축 |
+| **Extended Baseline** | 10 | AdamW ($lr=10^{-3}$) | 기본 증강 | 0.51 | **82.50%** | 장기 수렴 양상 확인 및 오답(Failure case) 분석 |
+| **XAI Integration** | - | - | 224×224 업샘플링 | - | - | Layer 4 기반 고대비 Grad-CAM 시각화 연동 |
+| **Optimized & Verified** | 12 | CosineAnnealingLR | ColorJitter + Sanity Check | **0.30** | **86.40%** | **손실값 진동 제어, 최고 성능 달성 (+3.9%p) 및 XAI 신뢰성 검증** |
 
 ![Ablation Comparison](results/ablation_compare.png)
 
 ### ? 최적화 실험 분석 (Ablation Study Insights)
 1. **Cosine Annealing LR 스케줄러를 통한 수렴 안정화:**
-   - 고정 학습률 사용 시 손실 함수 최저점 부근에서 보폭이 커 정확도가 77%~82% 구간에서 요동치던 현상 해결.
-   - 학습률이 코사인 곡선을 그리며 $10^{-5}$까지 감속하면서 손실값이 0.31까지 정밀 수렴.
+   - 고정 학습률 사용 시 손실 함수 최저점 부근에서 보폭이 커 정확도가 요동치던 현상을 해결.
+   - 학습률이 코사인 곡선을 그리며 $10^{-5}$까지 감속하면서 손실값이 0.30까지 정밀 수렴.
 2. **ColorJitter 증강을 통한 배경 편향(Context Bias) 억제:**
-   - 밝기·대비·채도를 무작위로 왜곡하여 배(ship)나 비행기(airplane)가 저채도 배경 색감에 의존하던 지름길 학습(Shortcut Learning)을 차단, 일반화 성능 개선.
+   - 밝기·대비·채도를 무작위로 왜곡하여 모델이 저채도 배경 색감에 의존하던 지름길 학습(Shortcut Learning)을 차단, 일반화 성능 개선.
 
 ---
 
@@ -37,12 +37,9 @@ PyTorch 기반의 합성곱 신경망(ResNet18) 전이학습, 점진적 하이퍼파라미터 최적화(Ab
 ![Model Comparison](results/xai_model_comparison.png)
 
 ### ? 정성적 의사결정 교정 분석 (Qualitative Comparison)
-- **비행기 (Target: airplane):**
-  - **Baseline (82.5%):** 기체 본체 실루엣을 웅크린 동물의 체형으로 오인하여 `cat`으로 오분류.
-  - **Optimized (86.1%):** 배경 색조 교란 및 미세 수렴을 거치며 날개 끝단 및 프로펠러 등 비행기 고유의 기하학적 구조에 초점이 맺혀 `airplane`으로 정상 분류.
 - **사슴 (Target: deer):**
-  - **Baseline (82.5%):** 사슴 본체 대신 좌측 나무 기둥 및 주변 숲 배경에 활성화가 분산되며 배경 편향으로 인해 `cat`으로 오분류.
-  - **Optimized (86.1%):** 배경을 배제하고 **사슴의 뿔, 머리, 등뼈 윤곽선**에 활성화가 집중되며 사물 본체 기반의 정상 분류로 교정됨.
+  - **Baseline (82.5%):** 사슴 본체 대신 좌측 나무 기둥 및 주변 풀숲 배경에 활성화가 강하게 분산되며 배경 편향으로 인해 전부 `cat`으로 오분류.
+  - **Optimized (86.4%):** 배경 노이즈를 억제하고 **사슴의 뿔, 얼굴 윤곽, 등뼈 라인**에 활성화가 집중되며 정상 분류로 교정됨.
 
 ### ? 텐서 차원(Tensor Dimension) 및 아키텍처 관점의 고찰
 - **`model.layer4[-1]` 타겟팅 이유:**
@@ -50,7 +47,7 @@ PyTorch 기반의 합성곱 신경망(ResNet18) 전이학습, 점진적 하이퍼파라미터 최적화(Ab
   - `AdaptiveAvgPool2d`를 통과해 1차원 벡터($1 \times 1 \times 512$)로 공간 좌표가 손실되기 직전, 2차원 공간 정보($7 \times 7$)가 유지되는 마지막 계층이기 때문임.
 - **224×224 업샘플링의 필요성:**
   - CIFAR-10 원본 해상도($32 \times 32$)는 계층을 통과하며 특징 맵이 $1 \times 1$ 크기로 축소되어 히트맵 해상도가 뭉개짐.
-  - 입력을 $224 \times 224$로 업샘플링하여 최종 합성곱 계층의 공간 해상도를 확보함으로써 사물 국소 영역에 맺히는 히트맵 도출.
+  - 입력을 $224 \times 224$로 업샘플링하여 최종 합성곱 계층의 공간 해상도를 확보함으로써 사물 국소 영역에 맺히는 고대비 히트맵 도출.
 
 ---
 
@@ -72,14 +69,14 @@ Saliency Map 기반 시각화 기법이 단순 엣지 검출기(Edge Detector)가 아닌 신경망 파
 # 1. 의존성 패키지 설치
 pip install -r requirements.txt
 
-# 2. 베이스라인 모델 학습 (Day 1-2)
+# 2. 베이스라인 모델 학습
 python3 main.py
 
-# 3. 고도화 최적화 학습 및 Ablation Study (Day 4, 86.1% 달성)
+# 3. 고도화 최적화 학습 및 Ablation Study (86.4% 달성)
 python3 train_advanced.py
 
 # 4. 베이스라인 vs 최적화 모델 간 Grad-CAM 대조 시각화
 python3 cam_compare.py
 
-# 5. XAI 모델 건전성 검증 (Day 5, Sanity Check)
+# 5. XAI 모델 건전성 검증 (Sanity Check)
 python3 sanity_check.py
