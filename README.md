@@ -1,13 +1,14 @@
-# ? Computer Vision Pipeline: Transfer Learning, Ablation Study, XAI Verification & Object Detection Benchmark
+# ? Computer Vision Pipeline: Transfer Learning, Ablation Study, XAI Verification & YOLO Benchmark
 
-PyTorch 기반 합성곱 신경망(ResNet18) 전이학습, 점진적 하이퍼파라미터 최적화(Ablation Study), 설명 가능한 AI(Grad-CAM) 신뢰성 검증(Sanity Check), 그리고 경량 객체 탐지 모델(YOLOv8n)의 실시간 추론 벤치마크를 통합 구축한 엔드투엔드 컴퓨터 비전 저장소입니다.
+PyTorch 기반 합성곱 신경망(ResNet18) 전이학습, 하이퍼파라미터 최적화(Ablation Study), 설명 가능한 AI(Grad-CAM) 신뢰성 검증(Sanity Check), 그리고 Ultralytics YOLOv8 경량 객체 탐지 모델의 실시간 추론 벤치마크 및 도메인 파인튜닝 파이프라인을 통합 구축한 저장소입니다.
 
 ## ? 주요 구현 내용
 - **Classification & Transfer Learning:** ImageNet 사전학습 ResNet18 백본 활용 및 CIFAR-10(10 Classes) 맞춤 FC Layer 재설계
 - **Data Augmentation & Optimization:** RandomCrop, RandomHorizontalFlip 및 배경 편향 완화를 위한 `ColorJitter` 적용, `CosineAnnealingLR` 스케줄링을 통한 수렴 안정화 (`weights/best_model_advanced.pth`)
 - **Explainable AI (XAI):** ResNet18 최상단 합성곱 블록(`layer4[-1]`) 타겟팅 기반 Grad-CAM 의사결정 시각화
 - **Model Sanity Check:** 논문 방법론(*Sanity Checks for Saliency Maps*, NeurIPS 2018)에 기반한 계층별 파라미터 무작위화 검증 수행
-- **Object Detection & Latency Benchmark:** Ultralytics YOLOv8 Nano 백본을 활용한 사물 바운딩 박스 검출 및 다회차 반복 추론 기반의 정량적 지연 시간(Latency)·처리량(FPS) 벤치마크
+- **Object Detection & Latency Benchmark:** Ultralytics YOLOv8 Nano 백본 기반 추론 지연 시간(Latency)·처리량(FPS) 정량 측정
+- **YOLO Domain Fine-tuning:** 사전학습된 YOLOv8n 백본을 도메인 데이터셋(COCO-128)에 10 Epoch 미세조정하여 바운딩 박스 검출 성능(mAP@50) 확보
 
 ---
 
@@ -19,7 +20,8 @@ PyTorch 기반 합성곱 신경망(ResNet18) 전이학습, 점진적 하이퍼파라미터 최적화(Abla
 | **Extended Convergence** | ResNet18 | 10 Epoch 확장 | Acc: **82.50%** | 파라미터 장기 수렴 및 오답(Failure case) 분석 |
 | **Ablation & Optimization** | ResNet18 | ColorJitter + CosineLR | Acc: **86.40%** | **손실값 진동 제어 및 최고 성능 달성 (+3.9%p)** |
 | **XAI Sanity Check** | ResNet18 | Parameter Randomization | Sensitivity Pass | 가중치 파괴 시 히트맵 붕괴를 통한 XAI 신뢰성 규명 |
-| **Object Detection** | YOLOv8n | 30회 반복 추론 벤치마크 | Latency: **33.80 ms** | **29.59 FPS 실시간 검출 파이프라인 구축** |
+| **Detection Benchmark** | YOLOv8n | 30회 반복 추론 벤치마크 | Latency: **33.80 ms** | **29.59 FPS 실시간 검출 파이프라인 구축** |
+| **YOLO Fine-tuning** | YOLOv8n | 10 Epoch 도메인 미세조정 | mAP@50: **71.85%** | **mAP@50-95: 54.47% 달성 (best.pt 생성)** |
 
 ![Ablation Comparison](results/ablation_compare.png)
 
@@ -65,16 +67,19 @@ Saliency Map 기반 시각화 기법이 단순 엣지 검출기(Edge Detector)가 아닌 신경망 파
 
 ---
 
-## ? 경량 객체 탐지 (YOLOv8) 및 추론 속도 벤치마크
-이미지 분류(Classification) 단계를 확장하여 실시간 단일 단계(Single-stage) 객체 탐지 파이프라인을 구축하고 추론 속도(FPS 및 Latency)를 정량 평가했습니다.
+## ? 경량 객체 탐지 (YOLOv8) 추론 벤치마크 및 파인튜닝
 
 ![Detection Benchmark](results/detection_sample.png)
 
-### ? 벤치마크 결과 지표 (30 Runs Averaged)
-* **Backbone Model:** Ultralytics YOLOv8n (Lightweight)
-* **Average Latency:** **33.80 ms** ($\pm$ 2.43 ms)
-* **Throughput (FPS):** **29.59 FPS**
-* **분석 결과:** 도로 주행 및 보행자 환경에서 버스 및 다중 인원에 대한 바운딩 박스와 클래스 확률(`bus: 0.87`, `person: 0.83~0.87`)을 안정적으로 검출하며 실시간 추론 기준선(~30 FPS)을 충족함.
+### ? 정량적 벤치마크 및 학습 지표
+* **추론 속도 벤치마크 (30 Runs Averaged):**
+  - **Backbone:** Ultralytics YOLOv8n
+  - **Average Latency:** **33.80 ms** ($\pm$ 2.43 ms)
+  - **Throughput:** **29.59 FPS** (실시간 검출 기준 충족)
+* **도메인 파인튜닝 평가 (Validation Metrics):**
+  - **mAP@50:** **71.85%** (IoU 임계값 0.5 기준 평균 정밀도)
+  - **mAP@50-95:** **54.47%** (엄격한 다중 IoU 임계값 종합 평가)
+  - **Checkpoint:** `results/yolo_finetune/weights/best.pt`
 
 ---
 
@@ -96,5 +101,8 @@ python3 cam_compare.py
 # 5. XAI 모델 건전성 검증 (Sanity Check)
 python3 sanity_check.py
 
-# 6. 객체 탐지 및 실시간 추론 속도 벤치마크
+# 6. 객체 탐지 추론 속도 벤치마크
 python3 detect_bench.py
+
+# 7. YOLO 도메인 파인튜닝 및 평가
+python3 train_yolo.py
